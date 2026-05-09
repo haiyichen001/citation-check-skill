@@ -228,13 +228,18 @@ description: 验证文本中的学术引用是否真实 — 查论文存不存�
    开始逐条验证? (每轮 10 条)
    ```
 
-### Phase 2 — 并行验证 (10 条/轮)
+### Phase 2 — 并行验证 (严格 10 条/轮)
 
-每条引用启用一个独立 `Explore` 子 Agent 做三层检查，全部并行：
+**强制规则：**
+- 每轮最多 10 条，多出来的自动进入下一轮
+- 每条引用开一个独立子 Agent 做三层检查
+- **必须一次性并行启动本轮所有 Agent**，不能逐个排队
+- 每个 Agent 完成后用 `TaskUpdate` 更新对应任务状态
+- 本轮全部完成后，自动启动下一轮，直到全部验证完毕
 
-#### Layer A：存在性验证
+#### 单条验证流程 (每个 Agent 独立执行)
 
-查证工具按优先级降级：
+**Layer A — 存在性验证：**
 
 | 条件 | 工具 | 精确度 |
 |------|------|--------|
@@ -245,26 +250,64 @@ description: 验证文本中的学术引用是否真实 — 查论文存不存�
 | 中文文献 | `mcp__paper-search__search_google_scholar` → WebSearch 知网/万方 | 中 |
 | 其它 | WebSearch / WebFetch | 低 |
 
-#### Layer B：元数据匹配
+**Layer B — 元数据匹配：** 对照字段检查表逐字段比对，加粗字段必须匹配。
 
-对照上面的**字段检查表**，根据引用类型逐字段比对。加粗字段必须匹配。
-
-#### Layer C：内容支撑验证
-
+**Layer C — 内容支撑验证：**
 1. 用 `mcp__scholar__read_paper` 或 `mcp__arxiv__download_paper` 获取论文内容（优先 Abstract + Introduction + Conclusion）
 2. 从引用位置的上下文提取 **主张 (Claim)** — 原文引用该论文时想证明什么
-3. 对比：论文实际内容是否支撑该主张
-   - **支撑**：论文明确写了相同的结论
-   - **夸大**：论文有相关讨论但不完全支持
-   - **无关**：论文内容与主张无关
-   - **矛盾**：论文结论与主张相反
-
-每完成一条，用 `TaskUpdate` 更新进度。用户实时看到状态。
+3. 对比论文实际内容是否支撑该主张：支撑 / 夸大 / 无关 / 矛盾
 
 检索技巧：
 - 标题搜索失败时，尝试去掉标点、用引号括起核心短语、只用前 5-8 个词
 - 中文名注意拼音/汉字双向搜索
 - 常见的 "et al." 缩略，尝试用第一作者全名 + 年份搜索
+
+#### 进度显示格式
+
+启动每轮时输出：
+
+```
+── Round 1/3 ── 验证 [1]-[10] ─────────────────────────────
+
+  [1]  Vaswani et al. (2017) "Attention Is All You Need"
+  [2]  Devlin et al. (2018) "BERT: Pre-training of..."
+  [3]  Brown et al. (2020) "Language Models are Few-Shot Learners"
+  [4]  Yao et al. (2022) "ReAct: Synergizing Reasoning..."
+  [5]  Daareyni et al. (2025) "Generative AI meets CAD..."
+  [6]  Deng et al. (2024) "An investigation on utilizing LLM..."
+  [7]  Koh (2024) "Auto-dsm: Using a large language model..."
+  [8]  Gpfert et al. (2024) "Opportunities for large language..."
+  [9]  Qian & Shi (2025) "Large language model-empowered..."
+  [10] Liang et al. (2025) "Towards a self-cognitive..."
+
+  ⏳ 全部 10 个 Agent 并行启动中...
+```
+
+每完成一个 Agent，用 TaskUpdate 更新，显示：
+
+```
+  ✅ [1]  Vaswani 2017 — 通过
+  ✅ [2]  Devlin 2018 — 通过
+  ⏳ [3]  Brown 2020 — 查证中...
+  ⚠️ [4]  Yao 2022 — 年份有出入 (2022→实际 ICLR 2023)
+  ⏳ [5]  Daareyni 2025 — 查证中...
+  📝 [6]  Deng 2024 — 查证中...
+  ❌ [7]  Koh 2024 — 查证中...
+  ⏳ [8]  Gpfert 2024 — 查证中...
+  ⏳ [9]  Qian 2025 — 查证中...
+  ⏳ [10] Liang 2025 — 查证中...
+```
+
+本轮 10 条全部完成后自动汇总：
+
+```
+── Round 1/3 完成 ─────────────────────────────────────────
+  ✅ 通过: 5  |  ⚠️ 信息有出入: 2  |  ❌ 伪造: 1  |  🔍 无法验证: 1  |  📝 内容不匹配: 1
+
+  剩余 11 条，自动进入 Round 2/3...
+```
+
+然后**立即自动**创建下一轮 10 个任务并启动 10 个 Agent。不需要等待用户确认。最后一轮结束后进入 Phase 3。
 
 ### Phase 3 — 汇总报告
 
