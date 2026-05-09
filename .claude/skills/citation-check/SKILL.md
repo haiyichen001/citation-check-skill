@@ -208,31 +208,40 @@ description: 验证文本中的学术引用是否真实 — 查论文存不存�
 | `mcp__scholar__*` | `npx smithery install @smithery-ai/scholar` | 公开 API |
 | `mcp__paper-search__*` | `npx smithery install @smithery-ai/paper-search` | 公开 API |
 
-### Phase 1 — 提取与展示
+### Phase 1 — 提取与前置问答
 
 1. 根据文件格式选择读取方式，提取全文
 2. 分离两样东西：
    - **参考文献列表**：文末/文内的引用条目
    - **引用位置映射**：正文每个引用标记的位置(行号/段落号) + 周围上下文 ±3句
 3. 识别每条引用的**类型**（对照上面的字段表）
-4. 输出提取清单给用户确认：
-   ```
-   文件: thesis.tex (LaTeX, 156KB)
-   提取到 12 条引用
+4. 输出提取清单后，**必须向用户提问以下两个问题**，用户不回答则等待，不得自动跳过：
 
-   [1] 期刊论文 | Vaswani et al. (2017) "Attention Is All You Need"
-       引用位置: Line 42, Line 108, Line 203
-   [2] 会议论文 | Chen et al. (2020) ...
-   ...
+---
 
-   开始逐条验证? (每轮 10 条)
-   ```
+**Q1 — 验证范围**
+
+```
+全部自动查完 (输入 all)，还是只查某几条 (输入编号如 1,3,5-8)？
+```
+
+**Q2 — 验证深度**
+
+```
+  [1] quick  — 只看 Abstract / TLDR           (~10k-15k tokens/条)
+  [2] normal — Abstract + Introduction + Conclusion  (~20k-50k tokens/条) [默认]
+  [3] deep   — 全文逐节对比，最彻底但最贵       (~50k-150k tokens/条)
+```
+
+用户输入数字 1/2/3，无输入则默认 normal。
+
+---
 
 ### Phase 2 — 并行验证 (严格 10 条/轮)
 
 **强制规则：**
 - 每轮最多 10 条，多出来的自动进入下一轮
-- 每条引用开一个独立子 Agent 做三层检查
+- 每条引用开一个独立子 Agent 做三层检查（Layer C 深度由用户选择决定）
 - **必须一次性并行启动本轮所有 Agent**，不能逐个排队
 - 每个 Agent 完成后用 `TaskUpdate` 更新对应任务状态
 - 本轮全部完成后，自动启动下一轮，直到全部验证完毕
@@ -252,10 +261,17 @@ description: 验证文本中的学术引用是否真实 — 查论文存不存�
 
 **Layer B — 元数据匹配：** 对照字段检查表逐字段比对，加粗字段必须匹配。
 
-**Layer C — 内容支撑验证：**
-1. 用 `mcp__scholar__read_paper` 或 `mcp__arxiv__download_paper` 获取论文内容（优先 Abstract + Introduction + Conclusion）
-2. 从引用位置的上下文提取 **主张 (Claim)** — 原文引用该论文时想证明什么
-3. 对比论文实际内容是否支撑该主张：支撑 / 夸大 / 无关 / 矛盾
+**Layer C — 内容支撑验证（深度取决于用户选择）：**
+
+| 深度 | 读取范围 | token 估算 |
+|------|---------|-----------|
+| quick | Abstract + TLDR（如有） | ~10k-15k |
+| normal | Abstract + Introduction + Conclusion | ~20k-50k |
+| deep | 全文逐节对比，含方法/实验/讨论 | ~50k-150k |
+
+流程：
+1. 从引用位置的上下文提取 **主张 (Claim)** — 原文引用该论文时想证明什么
+2. 按选定深度获取论文内容并对比：支撑 / 夸大 / 无关 / 矛盾
 
 检索技巧：
 - 标题搜索失败时，尝试去掉标点、用引号括起核心短语、只用前 5-8 个词
