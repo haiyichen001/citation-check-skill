@@ -1,59 +1,66 @@
 # Citation Check Skill
 
-Claude Code skill for verifying whether academic citations in AI-generated text are real or fabricated. Extracts references, cross-checks them against academic databases, and flags ghost citations.
+Claude Code skill for verifying whether academic citations in AI-generated text are real or fabricated. Supports PDF, DOCX, TXT, Markdown, and LaTeX.
 
-## Background
-
-LLMs are known to hallucinate plausible-looking citations — inventing paper titles, authors, and even DOIs that don't exist. This skill automates the verification process so you don't have to manually check every reference.
+Checks three things per citation: **existence**, **metadata accuracy**, and **content support** — whether the cited paper actually says what the author claims it says.
 
 ## Installation
 
-```bash
-# Clone the repo
-git clone git@github.com:haiyichen001/citation-check-skill.git
+### Step 1 — Install the skill
 
-# Copy the skill to your Claude Code skills directory
+```bash
+git clone git@github.com:haiyichen001/citation-check-skill.git
 cp -r citation-check-skill/.claude/skills/citation-check ~/.claude/skills/
 ```
 
-Or install via Smithery (coming soon).
+### Step 2 — Install MCP dependencies
+
+Three MCP servers are required. The skill will detect missing ones and refuse to run until all are installed.
+
+```bash
+npx smithery install @smithery-ai/arxiv
+npx smithery install @smithery-ai/scholar
+npx smithery install @smithery-ai/paper-search
+```
+
+| MCP | Backend | Login Required | API Key |
+|-----|---------|---------------|---------|
+| arxiv | arXiv public API | No | No |
+| scholar | Semantic Scholar API | No | No |
+| paper-search | PubMed / bioRxiv / Google Scholar | No | No |
+
+Restart Claude Code after installation.
 
 ## Usage
-
-Invoke the skill in Claude Code:
 
 ```
 /citation-check
 ```
 
-Then paste the text containing citations you want to verify. The skill will:
+Then provide a file path or paste text directly. The skill will:
 
-1. Extract all citations from the text
-2. Search academic databases (Semantic Scholar, arXiv, PubMed, Google Scholar)
-3. Cross-check titles, authors, years, and venues
-4. Output a structured verification report
+1. Extract all citations + their in-text locations + surrounding context
+2. Verify each citation in parallel (10 per batch)
+3. Output a structured report
 
-You can also pass text directly:
-
-```
-/citation-check The following paper claims that "Smith et al. (2023) demonstrated quantum supremacy using 1000 qubits in Nature Physics..."
-```
-
-## Verification Status Legend
+## Verification Status
 
 | Status | Meaning |
 |--------|---------|
-| ✅ Verified | Paper exists, key metadata matches |
-| ⚠️ Mismatch | Paper exists, but author/year/venue differs |
-| ❌ Fabricated | No matching paper found — likely hallucinated |
-| 🔍 Unverifiable | Insufficient info to verify |
+| ✅ Verified | Paper exists, metadata correct, content supports the claim |
+| ⚠️ Metadata Mismatch | Paper exists but author/year/venue differs |
+| 🔍 Content Mismatch | Paper exists and metadata is correct, but the cited paper does not support the claim made at the citation location |
+| ❌ Fabricated | Paper does not exist — likely AI hallucination |
+| 🔍 Unverifiable | Insufficient data to verify (e.g. Chinese thesis not indexed) |
 
-## Requirements
+## Supported Input Formats
 
-Requires Claude Code with MCP servers configured:
-- `scholar` (Semantic Scholar)
-- `arxiv` (arXiv API)
-- `paper-search` (multi-source paper search)
+| Format | Method |
+|--------|--------|
+| PDF | pdf-reader MCP |
+| DOCX | python-docx via Bash |
+| TXT / Markdown | Read tool |
+| LaTeX (.tex) | Read tool + `\cite{}` / `\bibitem{}` parsing |
 
 ## License
 

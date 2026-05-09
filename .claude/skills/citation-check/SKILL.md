@@ -172,6 +172,42 @@ description: 验证文本中的学术引用是否真实 — 查论文存不存�
 
 ## 工作流程
 
+### Phase 0 — MCP 依赖检测 (启动时强制执行)
+
+打开 skill 后**第一步**，扫描可用的 MCP 工具。三个 MCP 必须全部就绪，缺一个就停止并输出安装命令：
+
+```
+正在检测 MCP 依赖...
+  arxiv MCP       ✅ 已安装
+  scholar MCP     ❌ 未安装
+  paper-search    ✅ 已安装
+
+缺失: scholar MCP，请先安装后再试：
+
+方式一（推荐）— smithery 一键安装：
+  npx smithery install @smithery-ai/scholar
+
+方式二 — 手动配置，在 Claude Code 的 MCP 配置中添加：
+  {
+    "mcpServers": {
+      "scholar": {
+        "command": "npx",
+        "args": ["-y", "@smithery-ai/mcp-server-scholar"]
+      }
+    }
+  }
+
+安装完成后重新启动 Claude Code，再次 /citation-check。
+```
+
+三个 MCP 都就绪后方可进入 Phase 1。
+
+| MCP 工具前缀 | 安装包名 | 无需登录 |
+|-------------|---------|---------|
+| `mcp__arxiv__*` | `npx smithery install @smithery-ai/arxiv` | 公开 API |
+| `mcp__scholar__*` | `npx smithery install @smithery-ai/scholar` | 公开 API |
+| `mcp__paper-search__*` | `npx smithery install @smithery-ai/paper-search` | 公开 API |
+
 ### Phase 1 — 提取与展示
 
 1. 根据文件格式选择读取方式，提取全文
