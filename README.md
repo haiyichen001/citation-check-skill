@@ -4,6 +4,29 @@ Claude Code skill for verifying whether academic citations in AI-generated text 
 
 Checks three things per citation: **existence**, **metadata accuracy**, and **content support** — whether the cited paper actually says what the author claims it says.
 
+## Token Consumption Warning
+
+```
++====================================================================+
+|                                                                      |
+|   每条引用验证消耗 20,000 ~ 50,000 tokens                             |
+|                                                                      |
+|   一篇 30 条引用的论文 ≈ 600,000 ~ 1,500,000 tokens                   |
+|                                                                      |
+|   如果你用 Claude API 按量付费，请做好心理准备。                       |
+|                                                                      |
+|   但话说回来——                                                       |
+|                                                                      |
+|   你愿意花 tokens 查引用，说明你认真。                                |
+|   那个用 AI 瞎编参考文献的人，连 tokens 都不愿意花。                  |
+|                                                                      |
+|   谁更值得尊重？不言而喻。                                           |
+|                                                                      |
+|   学术诚信无价，查出来一条造假你就回本了。                            |
+|                                                                      |
++====================================================================+
+```
+
 ## Installation
 
 ### Step 1 — Install the skill
