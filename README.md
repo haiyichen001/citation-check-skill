@@ -59,6 +59,12 @@ Then provide a file path or paste text directly. The skill will:
 | ❌ Fabricated | Paper does not exist — likely AI hallucination |
 | 🔍 Unverifiable | Insufficient data to verify (e.g. Chinese thesis not indexed) |
 
+## Limitations
+
+**Chinese papers (CNKI/Wanfang/VIP) are not yet supported.** There is currently no open API or MCP server for Chinese academic databases. Chinese-language citations may return "unverifiable" results. Support for Chinese papers is under development.
+
+If you primarily work with Chinese-language literature, this skill is not ready for your use case yet.
+
 ## Supported Input Formats
 
 | Format | Method |

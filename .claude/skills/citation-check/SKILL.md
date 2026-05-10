@@ -30,7 +30,7 @@ MCP: arxiv ✅ | scholar ✅ | paper-search ✅
 
 ### 1.2 提取引用
 
-输出清单：
+输出原始清单：
 ```
 文件: paper.pdf (5页) | 提取到 N 条引用 | 类型: 期刊论文/会议/...
 
@@ -39,14 +39,30 @@ MCP: arxiv ✅ | scholar ✅ | paper-search ✅
 [2] ...
 ```
 
-### 1.3 用 AskUserQuestion 提问
+### 1.3 去重合并
 
-提取完后**立即**调用 `AskUserQuestion` 工具，设置两个问题：
+按 **标题 + 第一作者** 归一化（标题去标点、转小写后比对，第一作者取姓氏）。同一论文多次引用合并为一条，保留所有引用位置。
+
+去重后输出：
+```
+去重: 原始 N 条 → M 条独立论文 (减少 N-M 条重复)
+
+[1,7]  期刊 | Vaswani et al. (2017) "Attention Is All You Need"
+       位置: §I "code-centric automation..." / §III "self-attention enables..."
+[2]    会议 | ...
+[3,5,9] 预印本 | ...
+```
+
+编号沿用原始编号列表（如 `[1,7]`），后续查证和报告均以去重后的独立论文为单位。
+
+### 1.4 用 AskUserQuestion 提问
+
+去重后**立即**调用 `AskUserQuestion` 工具，设置两个问题：
 
 **问题一 — 验证范围（单选）**
 - header: "范围"
 - options:
-  - `all` / "全部验证 (共 N 条)"
+  - `all` / "全部验证 (共 M 条独立论文)"
   - `selected` / "手动指定编号 (如 1,3,5-8)"
 - multiSelect: false
 
@@ -65,28 +81,33 @@ MCP: arxiv ✅ | scholar ✅ | paper-search ✅
 ## Phase 2 — 并行验证 (10条/轮)
 
 ### 强制规则
-- 每轮严格 10 条，多余自动下一轮
-- 每条开一个独立 Explore 子 Agent，**全部并行启动**
+- 每轮严格 10 条独立论文，多余自动下一轮
+- 每条开一个独立 general-purpose 子 Agent，**全部并行启动**
 - Agent 完成后用 TaskUpdate 更新状态
 - 本轮全完成后自动进入下一轮，不等待用户
 
 ### 单条 Agent 任务
 
-每个 Agent 收到：编号、标题、作者、年份、DOI/ArXiv ID（如有）、引用位置的上下文（±3句）。
+每个 Agent 收到：原始编号列表（如 `[1,7]`）、标题、作者、年份、DOI/ArXiv ID（如有）、所有引用位置的上下文（每个位置 ±3 句）。
 
 三层检查：
 
-**Layer A — 存在性**
+**Layer A — 存在性（含容错 fallback 链）**
 
-| 条件 | 工具 |
-|------|------|
-| DOI | `mcp__scholar__get_paper` |
-| ArXiv ID | `mcp__arxiv__get_abstract` |
-| 标题 | `mcp__scholar__search_papers` |
-| 仅作者+关键词 | 组合搜索 |
-| 兜底 | WebSearch |
+按优先级依次尝试，任意一步成功即停止。每步最多重试 1 次（超时/网络错误），失败则进入下一步。
 
-标题搜索失败时：去标点、引号括核心短语、只取前 5-8 词。
+| 优先级 | 条件 | 工具 | 失败处理 |
+|--------|------|------|----------|
+| 1 | 有 DOI | `mcp__scholar__get_paper` | → 优先级 2 |
+| 2 | 有 ArXiv ID | `mcp__arxiv__get_abstract` | → 优先级 3 |
+| 3 | 有标题 | `mcp__scholar__search_papers`（完整标题） | → 优先级 4 |
+| 4 | 标题搜索失败 | 去标点、引号括核心短语、只取前 5-8 词，重试 `mcp__scholar__search_papers` | → 优先级 5 |
+| 5 | 标题搜索仍失败 | 换数据源：`mcp__arxiv__search_papers` | → 优先级 6 |
+| 6 | 前两步都失败 | 换数据源：`mcp__paper-search__search_google_scholar` | → 优先级 7 |
+| 7 | 只有作者+年份+关键词 | 组合搜索：`mcp__scholar__search_papers`（作者 + 2-3 个核心关键词） | → 优先级 8 |
+| 8 | 以上全部失败 | `WebSearch`（论文标题 + "paper" / "pdf"） | → 判定为无法确认 |
+
+每条 fallback 都记录尝试路径，最终报告里标注实际用到的数据源。
 
 **Layer B — 元数据**
 
@@ -133,13 +154,14 @@ Agent 完成后即时更新：
 文件: xxx.pdf | 引用总数: N
 ✅ 通过: N | ⚠️ 信息有出入: N | ❌ 伪造: N | 🔍 无法验证: N | 📝 内容不匹配: N
 
-[1] ✅ Author (Year) "Title"
-    类型: 期刊 | 位置: Line 42, §2.1
+[1,7] ✅ Author (Year) "Title"
+    类型: 期刊 | 位置: §I Line 42, §III Line 128
     元数据: 全部匹配
-    内容: 主张 "xxx" → 论文支持 ✓
+    内容: §I 主张 "xxx" → 论文支持 ✓ / §III 主张 "yyy" → 论文支持 ✓
     证据: DOI/arXiv链接
 
 [2] ⚠️ Author (Year) "Title"
+    类型: 会议 | 位置: §2.1 Line 56
     元数据不匹配: 年份 2019 → 实际 2018
     ...
 
