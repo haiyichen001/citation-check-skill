@@ -1,6 +1,7 @@
 ---
 name: citation-check
 description: 验证学术引用是否真实 — 查论文存不存在、信息对不对、原文引用位置内容是否匹配。支持 PDF/Word/TXT/Markdown/LaTeX。使用 /citation-check 调用。
+compatibility: Requires MCP servers: arxiv, scholar, paper-search, pdf-reader
 ---
 
 # Citation Check
