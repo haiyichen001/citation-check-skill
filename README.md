@@ -1,3 +1,5 @@
+> **Merged into [Reference Workbench](https://github.com/haiyichen001/reference-workbench-skill). This repository is no longer updated.**
+
 # Citation Check Skill
 
 Claude Code skill for verifying whether academic citations in AI-generated text are real or fabricated. Supports PDF, DOCX, TXT, Markdown, and LaTeX.
